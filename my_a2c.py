@@ -20,7 +20,7 @@ def build_actor_critic(state_dim, action_dim):
     input_state = Input(shape=state_dim)
     dense1 = Dense(64, activation='relu')(input_state)
     dense2 = Dense(64, activation='relu')(dense1)
-    output_actions = Dense(action_dim, activation='softmax')(dense2)
+    output_actions = Dense(action_dim[0], activation='softmax')(dense2)
 
     # Critic network
     dense3 = Dense(64, activation='relu')(input_state)
@@ -114,19 +114,19 @@ env = make_env(
 
 # Get the state and action dimensions
 state_dim = env.observation_space.spaces['goal_obj_pos'].shape
-action_dim = env.action_space.nvec[0]
+action_dim = env.action_space.nvec.shape
 
 # Create the A2C agent
 agent = A2CAgent(state_dim, action_dim)
 
 # Training loop
 for episode in range(NUM_EPISODES):
-    state = env.reset
+    state = env.reset()
     episode_reward = 0
 
     for step in range(MAX_STEPS):
         # Get an action from the agent
-        action = agent.get_action(state)
+        action = agent.get_action(state['goal_obj_pos'])
 
         # Take a step in the environment
         next_state, reward, done, _ = env.step(action)
