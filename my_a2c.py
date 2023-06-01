@@ -126,7 +126,7 @@ for episode in range(NUM_EPISODES):
 
     for step in range(MAX_STEPS):
         # Get an action from the agent
-        action = agent.get_action(state['goal_obj_pos'])
+        action = agent.get_action(state['obj_pos'])
 
         # Take a step in the environment
         next_state, reward, done, _ = env.step(action)
