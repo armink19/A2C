@@ -15,12 +15,14 @@ NUM_EPISODES = 1000  # Number of episodes
 MAX_STEPS = 1000  # Maximum number of steps per episode
 
 # Define the Actor-Critic network
-def build_actor_critic(state_dim, action_dim):
+def build_actor_critic(state_dim, action_dim: np.ndarray):
     # Actor network
     input_state = Input(shape=state_dim)
     dense1 = Dense(64, activation='relu')(input_state)
     dense2 = Dense(64, activation='relu')(dense1)
-    output_actions = Dense(action_dim[0], activation='softmax')(dense2)
+    output_actions=[]
+    for i in range(action_dim.size):
+            output_actions.append( Dense(action_dim[i],activation='softmax')(dense2))
 
     # Critic network
     dense3 = Dense(64, activation='relu')(input_state)
@@ -35,6 +37,7 @@ def build_actor_critic(state_dim, action_dim):
     actor.compile(optimizer=adam_v2.Adam(lr=LR_ACTOR), loss='categorical_crossentropy')
     critic.compile(optimizer=adam_v2.Adam(lr=LR_CRITIC), loss='mean_squared_error')
 
+    actor.summary()
     return actor, critic
 
 # A2C agent
@@ -44,14 +47,23 @@ class A2CAgent:
         self.action_dim = action_dim
         self.actor, self.critic = build_actor_critic(state_dim, action_dim)
 
+    
     def get_action(self, state):
         state = np.expand_dims(state, axis=0)
-        action_probs = self.actor.predict(state).flatten()
-        action = np.random.choice(self.action_dim, 1, p=action_probs)[0]
-        return action
+        action_probs = self.actor.predict(state).flatten().tolist()
+        # action = np.random.choice(self.action_dim, 1, p=action_probs)[0]
+        
+        actions = []
+        for i in self.action_dim:
+            tmp = action_probs[:i]
+            tmp = tmp / np.sum(tmp)
+            actions.append(np.random.choice(i, 1, p=tmp)[0])
+            action_probs = action_probs[i:]
+
+        return actions
 
     def train(self, states, actions, rewards, next_states, dones):
-        states = np.array(states)
+        states = np.array(states.values())
         actions = np.array(actions)
         rewards = np.array(rewards)
         next_states = np.array(next_states)
@@ -114,7 +126,7 @@ env = make_env(
 
 # Get the state and action dimensions
 state_dim = env.observation_space.spaces['goal_obj_pos'].shape
-action_dim = env.action_space.nvec.shape
+action_dim = env.action_space.nvec
 
 # Create the A2C agent
 agent = A2CAgent(state_dim, action_dim)
@@ -132,7 +144,7 @@ for episode in range(NUM_EPISODES):
         next_state, reward, done, _ = env.step(action)
 
         # Store the transition in memory
-        agent.memory.append((state, action, reward, next_state, done))
+        agent.train(state, action, reward, next_state, done)
 
         # Update the current state and episode reward
         state = next_state
@@ -144,6 +156,6 @@ for episode in range(NUM_EPISODES):
             break
 
         # Update the agent
-        if len(agent.memory) >= agent.batch_size:
+        if len(agent.train) >= agent.batch_size:
             agent.update()
 
