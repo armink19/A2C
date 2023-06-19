@@ -2,8 +2,9 @@ import gym
 import robogym
 import numpy as np
 import tensorflow as tf
+from tensorflow import convert_to_tensor
 from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.layers import Dense, Input
+from tensorflow.python.keras.layers import Dense, Input, Flatten
 from tensorflow.python.keras.optimizers import adam_v2
 from robogym.envs.rearrange.blocks_train import make_env
 
@@ -18,14 +19,15 @@ MAX_STEPS = 1000  # Maximum number of steps per episode
 def build_actor_critic(state_dim, action_dim: np.ndarray):
     # Actor network
     input_state = Input(shape=state_dim)
-    dense1 = Dense(64, activation='relu')(input_state)
+    flatten= Flatten()(input_state)
+    dense1 = Dense(64, activation='relu')(flatten)
     dense2 = Dense(64, activation='relu')(dense1)
     output_actions=[]
     for i in range(action_dim.size):
             output_actions.append( Dense(action_dim[i],activation='softmax')(dense2))
 
     # Critic network
-    dense3 = Dense(64, activation='relu')(input_state)
+    dense3 = Dense(64, activation='relu')(flatten)
     dense4 = Dense(64, activation='relu')(dense3)
     output_value = Dense(1, activation='linear')(dense4)
 
@@ -38,6 +40,7 @@ def build_actor_critic(state_dim, action_dim: np.ndarray):
     critic.compile(optimizer=adam_v2.Adam(lr=LR_CRITIC), loss='mean_squared_error')
 
     actor.summary()
+    critic.summary()
     return actor, critic
 
 # A2C agent
@@ -50,30 +53,31 @@ class A2CAgent:
     
     def get_action(self, state):
         state = np.expand_dims(state, axis=0)
-        action_probs = self.actor.predict(state).flatten().tolist()
-        # action = np.random.choice(self.action_dim, 1, p=action_probs)[0]
-        
+        test= self.actor.predict(state)
+        action_probs =[]
+        for i in test:
+            action_probs.append(i.flatten().tolist())
         actions = []
-        for i in self.action_dim:
-            tmp = action_probs[:i]
-            tmp = tmp / np.sum(tmp)
-            actions.append(np.random.choice(i, 1, p=tmp)[0])
-            action_probs = action_probs[i:]
+        for arr in action_probs:
+            arr = np.array(arr) / np.sum(arr)
+            actions.append(np.random.choice(len(arr), 1, p=arr)[0])
+            
 
         return actions
 
     def train(self, states, actions, rewards, next_states, dones):
-        states = np.array(states.values())
+        states = np.array(states['obj_pos'])
         actions = np.array(actions)
         rewards = np.array(rewards)
         next_states = np.array(next_states)
+        next_states= np.expand_dims(next_states, axis=0)
 
         # Compute TD targets
         next_values = self.critic.predict(next_states)
         td_targets = rewards + GAMMA * next_values * (1 - dones)
 
         # Train critic
-        self.critic.fit(states, td_targets, verbose=0)
+        self.critic.fit(states[0], td_targets, verbose=0)
 
         # Compute advantages
         values = self.critic.predict(states)
@@ -144,7 +148,7 @@ for episode in range(NUM_EPISODES):
         next_state, reward, done, _ = env.step(action)
 
         # Store the transition in memory
-        agent.train(state, action, reward, next_state, done)
+        agent.train(state, action, reward, next_state['obj_pos'], done)
 
         # Update the current state and episode reward
         state = next_state
