@@ -18,16 +18,17 @@ MAX_STEPS = 1000  # Maximum number of steps per episode
 # Define the Actor-Critic network
 def build_actor_critic(state_dim, action_dim: np.ndarray):
     # Actor network
-    input_state = Input(shape=state_dim)
-    flatten= Flatten()(input_state)
-    dense1 = Dense(64, activation='relu')(flatten)
+    input_state = Input(shape=(96,))
+    #input_state = Input(shape=state_dim)
+    #flatten= Flatten()(input_state)
+    dense1 = Dense(64, activation='relu')(input_state)
     dense2 = Dense(64, activation='relu')(dense1)
     output_actions=[]
     for i in range(action_dim.size):
             output_actions.append( Dense(action_dim[i],activation='softmax')(dense2))
 
     # Critic network
-    dense3 = Dense(64, activation='relu')(flatten)
+    dense3 = Dense(64, activation='relu')(input_state)
     dense4 = Dense(64, activation='relu')(dense3)
     output_value = Dense(1, activation='linear')(dense4)
 
@@ -52,7 +53,8 @@ class A2CAgent:
 
     
     def get_action(self, state):
-        state = np.expand_dims(state, axis=0)
+        #state = np.expand_dims(state, axis=0)
+        state = np.expand_dims(state.flatten(),axis=0)
         test= self.actor.predict(state)
         action_probs =[]
         for i in test:
@@ -66,28 +68,35 @@ class A2CAgent:
         return actions
 
     def train(self, states, actions, rewards, next_states, dones):
-        states = np.array(states['obj_pos'])
+        states = np.expand_dims(np.array(states['obj_pos']).ravel(), axis=0)
         actions = np.array(actions)
         rewards = np.array(rewards)
         next_states = np.array(next_states)
-        next_states= np.expand_dims(next_states, axis=0)
+        next_states= np.expand_dims(next_states.ravel(), axis=0)
 
         # Compute TD targets
         next_values = self.critic.predict(next_states)
         td_targets = rewards + GAMMA * next_values * (1 - dones)
 
         # Train critic
-        self.critic.fit(states[0], td_targets, verbose=0)
+        self.critic.fit(states, td_targets, verbose=0)
 
         # Compute advantages
         values = self.critic.predict(states)
         advantages = td_targets - values
 
         # One-hot encode actions
-        actions_onehot = np.eye(self.action_dim)[actions]
+        actions_onehot = np.eye(max(self.action_dim),11)[actions]
+
+        #expading dimensions to have matching shape
+        actions_onehot = np.expand_dims(actions_onehot, axis=0)
+        for val in actions_onehot:
+            for val2 in val:
+                val2= np.expand_dims(val2, axis=0)
+                actions_onehot=val2
 
         # Train actor
-        self.actor.fit(states, actions_onehot, sample_weight=advantages.flatten(), verbose=0)
+        self.actor.fit(states, actions_onehot, sample_weight=advantages, verbose=0)
 
 # Create the RoboGym environment
 env = make_env(
@@ -146,6 +155,7 @@ for episode in range(NUM_EPISODES):
 
         # Take a step in the environment
         next_state, reward, done, _ = env.step(action)
+        reward = reward[0]
 
         # Store the transition in memory
         agent.train(state, action, reward, next_state['obj_pos'], done)
@@ -160,6 +170,6 @@ for episode in range(NUM_EPISODES):
             break
 
         # Update the agent
-        if len(agent.train) >= agent.batch_size:
-            agent.update()
+        #if len(agent.train) >= agent.batch_size:
+        #    agent.update()
 
