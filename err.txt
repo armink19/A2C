@@ -1,0 +1,1 @@
+ls/Library/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python: can't open file '/Users/kehonjicarmin/Documents/MICS Semester 4/A2C/a2c_updated': [Errno 2] No such file or directory

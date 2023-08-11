@@ -1,0 +1,5 @@
+Standard parms : 1 neuron for critic
+LR ACTOR: 0.01
+LR CRITIC: 0.01
+EPSIODES:250
+STEPS: 10
